@@ -76,7 +76,7 @@ function showHome() {
     <section class="card history">
       <div class="row-between">
         <h2>Your previous results</h2>
-        <button class="btn ghost small" id="clear-history">Clear</button>
+        <button class="btn small" id="clear-history">Clear all</button>
       </div>
       <ul class="hist-list">
         ${history.map((r, i) => `
@@ -101,7 +101,14 @@ function showHome() {
   $('#start').addEventListener('click', () => startTest());
   app.querySelectorAll<HTMLButtonElement>('.hist').forEach(b =>
     b.addEventListener('click', () => showResults(history[Number(b.dataset.i)])));
-  app.querySelector('#clear-history')?.addEventListener('click', () => { clearHistory(); showHome(); });
+  app.querySelector('#clear-history')?.addEventListener('click', () => confirmDialog({
+    title: 'Clear all results?',
+    body: `This permanently deletes ${history.length === 1 ? 'your saved result' : `all <strong>${history.length}</strong> saved results`} from this browser, including their solutions. It can't be undone.`,
+    cancel: 'Keep them',
+    confirm: 'Clear all',
+    danger: true,
+    onConfirm: () => { clearHistory(); showHome(); },
+  }));
 }
 
 // =============================================================================================
@@ -220,31 +227,50 @@ function renderQuestion() {
     </div>`;
 }
 
-function confirmSubmit() {
-  const s = session!;
-  const answered = s.answers.filter(a => a !== null).length;
+interface ConfirmOptions {
+  title: string;
+  body: string;
+  cancel: string;
+  confirm: string;
+  /** Destructive action: red button, and focus starts on Cancel so Enter can't trigger it by accident. */
+  danger?: boolean;
+  onConfirm: () => void;
+}
+
+function confirmDialog(o: ConfirmOptions) {
   const back = document.createElement('div');
   back.className = 'modal-back';
   back.innerHTML = `
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
-      <h2 id="m-title">Submit your answers?</h2>
-      <p>You've answered <strong>${answered} of ${puzzles.length}</strong> puzzles and have <strong>${fmtTime(remaining())}</strong> left.
-      ${answered < puzzles.length ? 'Unanswered puzzles count as wrong.' : ''}</p>
+      <h2 id="m-title">${o.title}</h2>
+      <p>${o.body}</p>
       <div class="modal-actions">
-        <button class="btn" data-act="cancel">Keep going</button>
-        <button class="btn primary" data-act="submit">Submit</button>
+        <button class="btn" data-act="cancel">${o.cancel}</button>
+        <button class="btn ${o.danger ? 'danger' : 'primary'}" data-act="confirm">${o.confirm}</button>
       </div>
     </div>`;
   const close = () => { back.remove(); document.removeEventListener('keydown', onKey, true); };
   const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
   back.addEventListener('click', e => {
     const act = (e.target as HTMLElement).closest<HTMLElement>('[data-act]')?.dataset.act;
-    if (act === 'submit') { close(); finish(false); }
+    if (act === 'confirm') { close(); o.onConfirm(); }
     else if (act === 'cancel' || e.target === back) close();
   });
   document.addEventListener('keydown', onKey, true);
   document.body.appendChild(back);
-  back.querySelector<HTMLButtonElement>('[data-act="submit"]')!.focus();
+  back.querySelector<HTMLButtonElement>(`[data-act="${o.danger ? 'cancel' : 'confirm'}"]`)!.focus();
+}
+
+function confirmSubmit() {
+  const answered = session!.answers.filter(a => a !== null).length;
+  confirmDialog({
+    title: 'Submit your answers?',
+    body: `You've answered <strong>${answered} of ${puzzles.length}</strong> puzzles and have <strong>${fmtTime(remaining())}</strong> left.
+      ${answered < puzzles.length ? 'Unanswered puzzles count as wrong.' : ''}`,
+    cancel: 'Keep going',
+    confirm: 'Submit',
+    onConfirm: () => finish(false),
+  });
 }
 
 function finish(timedOut: boolean) {
