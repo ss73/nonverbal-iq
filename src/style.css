@@ -19,8 +19,10 @@
   color-scheme: light;
 }
 
+/* Dark palette: follows the system unless the theme switcher forces light (data-theme="light"),
+   and always applies when it forces dark (data-theme="dark"). Keep the two blocks identical. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #131416;
     --surface: #1c1e21;
     --ink: #ececec;
@@ -39,6 +41,26 @@
     --shadow: none;
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #131416;
+  --surface: #1c1e21;
+  --ink: #ececec;
+  --muted: #9b9ea4;
+  --line: #2f3236;
+  --accent: #7ea3ff;
+  --accent-ink: #0c1328;
+  --accent-soft: #1f2a47;
+  --ok: #63c891;
+  --ok-soft: #173326;
+  --bad: #ff8a80;
+  --bad-soft: #3a1d1b;
+  --warn: #ffb35c;
+  --paper: #f4f3ef;
+  --paper-line: #3a3d42;
+  --shadow: none;
+  color-scheme: dark;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -86,6 +108,38 @@ kbd {
   text-transform: uppercase;
   color: var(--accent);
 }
+
+/* ---------- Theme switcher ---------- */
+
+.topbar { display: flex; justify-content: flex-end; margin-bottom: -8px; }
+.theme-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+.theme-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.theme-switch button:hover { color: var(--ink); }
+.theme-switch button[aria-checked="true"] { background: var(--accent-soft); color: var(--accent); }
+.theme-switch button:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.theme-switch svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.theme-switch [data-theme-choice="dark"] svg { fill: currentColor; }
 
 .row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
