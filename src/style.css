@@ -289,13 +289,16 @@ kbd {
 }
 .stem.series .cell { background: var(--paper); border: 2px solid var(--paper-line); border-radius: 8px; padding: 6px; }
 
+/* The missing cell holds no figure, so it gets the figure cells' size explicitly (figure + 16px of
+   padding and border); otherwise a column of its own — the sixth series frame — shrinks to the "?". */
 .cell.missing {
   display: grid;
   place-items: center;
-  min-height: calc(var(--fig) + 16px);
+  width: calc(var(--fig) + 16px);
+  height: calc(var(--fig) + 16px);
   background: repeating-linear-gradient(45deg, #f1efe9, #f1efe9 6px, #faf9f6 6px, #faf9f6 12px);
 }
-.stem.series .cell.missing { border-style: dashed; min-height: calc(var(--fig) + 16px); }
+.stem.series .cell.missing { border-style: dashed; }
 .cell.missing span { font-size: calc(var(--fig) * 0.4); font-weight: 700; color: #8a8780; }
 
 .options {
