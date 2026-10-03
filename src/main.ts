@@ -76,7 +76,7 @@ function showHome() {
     <section class="card history">
       <div class="row-between">
         <h2>Your previous results</h2>
-        <button class="btn small" id="clear-history">Clear all</button>
+        <button class="btn ghost small" id="clear-history">Clear</button>
       </div>
       <ul class="hist-list">
         ${history.map((r, i) => `
