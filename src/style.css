@@ -87,14 +87,6 @@ button, .opt, .fig { -webkit-user-select: none; user-select: none; -webkit-touch
   html, body { overscroll-behavior-y: none; }
 }
 html.native, html.native body { overscroll-behavior-y: none; }
-kbd {
-  font: 0.85em ui-monospace, SFMono-Regular, Menlo, monospace;
-  padding: 0.05em 0.4em;
-  border: 1px solid var(--line);
-  border-bottom-width: 2px;
-  border-radius: 5px;
-}
-
 .wrap {
   max-width: 1040px;
   margin: 0 auto;
