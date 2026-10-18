@@ -19,8 +19,8 @@
   color-scheme: light;
 }
 
-/* Dark palette: follows the system unless the theme switcher forces light (data-theme="light"),
-   and always applies when it forces dark (data-theme="dark"). Keep the two blocks identical. */
+/* Dark palette: follows the system. data-theme="light"/"dark" on <html> forces a palette; nothing sets
+   it today, but src/theme.ts keeps that ready for a future Settings screen. Keep the two blocks identical. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #131416;
@@ -77,7 +77,15 @@ body {
 
 h1, h2, h3 { line-height: 1.2; margin: 0; }
 p { margin: 0; }
-button { font: inherit; color: inherit; }
+button { font: inherit; color: inherit; touch-action: manipulation; }
+
+/* App feel on touch screens: no text-selection or image callouts on long-press of controls and figures. */
+button, .opt, .fig { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+/* Installed to the home screen: no pull-to-refresh or rubber-band bounce revealing the browser behind. */
+@media (display-mode: standalone) {
+  html, body { overscroll-behavior-y: none; }
+}
 kbd {
   font: 0.85em ui-monospace, SFMono-Regular, Menlo, monospace;
   padding: 0.05em 0.4em;
@@ -108,38 +116,6 @@ kbd {
   text-transform: uppercase;
   color: var(--accent);
 }
-
-/* ---------- Theme switcher ---------- */
-
-.topbar { display: flex; justify-content: flex-end; margin-bottom: -8px; }
-.theme-switch {
-  display: inline-flex;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface);
-}
-.theme-switch button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  color: var(--muted);
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.theme-switch button:hover { color: var(--ink); }
-.theme-switch button[aria-checked="true"] { background: var(--accent-soft); color: var(--accent); }
-.theme-switch button:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
-.theme-switch svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.theme-switch [data-theme-choice="dark"] svg { fill: currentColor; }
 
 .row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 

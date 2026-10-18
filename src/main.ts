@@ -6,7 +6,6 @@ import { figureSvg } from './render';
 import { newSeed } from './rng';
 import { scoreRound } from './scoring';
 import { type ResultRecord, type Session, addHistory, clearHistory, loadHistory, loadSession, saveSession } from './storage';
-import { bindThemeSwitcher, themeSwitcherHtml } from './theme';
 
 const app = document.getElementById('app')!;
 document.body.insertAdjacentHTML('afterbegin', PATTERN_DEFS);
@@ -40,7 +39,6 @@ function showHome() {
   const history = loadHistory();
   app.innerHTML = `
   <main class="wrap home">
-    <div class="topbar">${themeSwitcherHtml()}</div>
     <header class="hero">
       <p class="eyebrow">Nonverbal reasoning test</p>
       <h1>How well do you see patterns?</h1>
@@ -101,7 +99,6 @@ function showHome() {
   </main>`;
 
   $('#start').addEventListener('click', () => startTest());
-  bindThemeSwitcher(app);
   app.querySelectorAll<HTMLButtonElement>('.hist').forEach(b =>
     b.addEventListener('click', () => showResults(history[Number(b.dataset.i)])));
   app.querySelector('#clear-history')?.addEventListener('click', () => confirmDialog({
@@ -342,7 +339,6 @@ function showResults(record: ResultRecord) {
 
   app.innerHTML = `
   <main class="wrap results">
-    <div class="topbar">${themeSwitcherHtml()}</div>
     <section class="card score-card">
       <p class="eyebrow">${record.timedOut ? 'Time’s up — your result' : 'Your result'}</p>
       <div class="score-main">
@@ -388,7 +384,6 @@ function showResults(record: ResultRecord) {
   </main>`;
 
   $('#again').addEventListener('click', () => startTest());
-  bindThemeSwitcher(app);
   $('#home').addEventListener('click', showHome);
   app.querySelectorAll<HTMLButtonElement>('.rv-head').forEach(btn => btn.addEventListener('click', () => {
     const i = Number(btn.dataset.i);
@@ -433,6 +428,12 @@ document.addEventListener('keydown', e => {
 
 // =============================================================================================
 // Boot: resume a round in progress (the clock keeps running across reloads).
+
+// Offline support for the hosted web version. Skipped in development, and inside a native app shell
+// (which serves the files from the device and doesn't use an https: origin).
+if ('serviceWorker' in navigator && import.meta.env.PROD && location.protocol === 'https:') {
+  navigator.serviceWorker.register('./sw.js').catch(() => { /* offline support is optional */ });
+}
 
 session = loadSession();
 if (session) {
