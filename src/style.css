@@ -82,10 +82,11 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 /* App feel on touch screens: no text-selection or image callouts on long-press of controls and figures. */
 button, .opt, .fig { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 
-/* Installed to the home screen: no pull-to-refresh or rubber-band bounce revealing the browser behind. */
+/* Installed to the home screen or running in the native app: no pull-to-refresh or rubber-band bounce. */
 @media (display-mode: standalone) {
   html, body { overscroll-behavior-y: none; }
 }
+html.native, html.native body { overscroll-behavior-y: none; }
 kbd {
   font: 0.85em ui-monospace, SFMono-Regular, Menlo, monospace;
   padding: 0.05em 0.4em;
@@ -98,7 +99,8 @@ kbd {
   max-width: 1040px;
   margin: 0 auto;
   padding-inline: max(16px, env(safe-area-inset-left));
-  padding-block: 24px 48px;
+  /* Clear the status bar / notch and home indicator when the page runs edge to edge (native app, PWA). */
+  padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(48px + env(safe-area-inset-bottom, 0px));
 }
 
 .card {

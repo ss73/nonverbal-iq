@@ -17,6 +17,21 @@ Push to `main` on GitHub, then under **Settings → Pages** set **Source** to **
 `.github/workflows/deploy.yml` tests, builds and publishes `dist/`. The Vite `base` is relative, so the
 site works from any `https://<user>.github.io/<repo>/` path.
 
+## iOS app (Capacitor)
+
+The same web build is wrapped as a native iOS app with [Capacitor](https://capacitorjs.com/). The Xcode
+project lives in `ios/`; the web files are copied into it on every sync and are not committed.
+
+Requires Xcode (opened once to accept the licence and install the iOS simulator).
+
+```bash
+npm run ios       # build, sync into ios/, open the project in Xcode
+npm run ios:run   # build, sync and launch on a simulator or connected device
+```
+
+The app icon and launch screen images are in `ios/App/App/Assets.xcassets`. The bundle id
+(`capacitor.config.ts`) can't be changed once the app is published.
+
 ## How it works
 
 - `src/gen/matrix.ts` builds Raven-style 3×3 matrices from rule types (constant, progression, distribute-three,

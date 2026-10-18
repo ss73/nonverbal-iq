@@ -1,4 +1,5 @@
 import './style.css';
+import { Capacitor } from '@capacitor/core';
 import type { Puzzle } from './types';
 import { GEN_VERSION, ROUND_ITEMS, ROUND_MS, buildRound } from './gen/round';
 import { LETTERS, PATTERN_DEFS } from './figures';
@@ -8,6 +9,7 @@ import { scoreRound } from './scoring';
 import { type ResultRecord, type Session, addHistory, clearHistory, loadHistory, loadSession, saveSession } from './storage';
 
 const app = document.getElementById('app')!;
+if (Capacitor.isNativePlatform()) document.documentElement.classList.add('native');
 document.body.insertAdjacentHTML('afterbegin', PATTERN_DEFS);
 
 let session: Session | null = null;

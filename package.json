@@ -7,11 +7,18 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "ios": "npm run build && cap sync ios && cap open ios",
+    "ios:run": "npm run build && cap sync ios && cap run ios"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.2",
     "vitest": "^5.0.3"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "^8.5.3"
   }
 }
