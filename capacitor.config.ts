@@ -5,6 +5,14 @@ const config: CapacitorConfig = {
   appId: 'io.github.ss73.nonverbaliq',
   appName: 'Nonverbal IQ',
   webDir: 'dist',
+  plugins: {
+    SplashScreen: {
+      // Keep the launch screen up until the first screen has rendered (see main.ts), so there is
+      // no blank flash while the web view starts.
+      launchAutoHide: false,
+      launchFadeOutDuration: 250,
+    },
+  },
   ios: {
     // The page handles safe areas itself (viewport-fit=cover + env(safe-area-inset-*)).
     contentInset: 'never',

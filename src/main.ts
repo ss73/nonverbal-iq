@@ -1,5 +1,6 @@
 import './style.css';
 import { Capacitor } from '@capacitor/core';
+import { SplashScreen } from '@capacitor/splash-screen';
 import type { Puzzle } from './types';
 import { GEN_VERSION, ROUND_ITEMS, ROUND_MS, buildRound } from './gen/round';
 import { LETTERS, PATTERN_DEFS } from './figures';
@@ -444,3 +445,7 @@ if (session) {
 } else {
   showHome();
 }
+
+// Native app: the launch screen stays up until now (launchAutoHide is off), then fades out once the
+// first screen has painted.
+if (Capacitor.isNativePlatform()) requestAnimationFrame(() => requestAnimationFrame(() => SplashScreen.hide()));
