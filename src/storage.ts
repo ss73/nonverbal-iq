@@ -59,3 +59,16 @@ export function addHistory(r: ResultRecord): void {
 }
 
 export const clearHistory = () => write(HISTORY_KEY, null);
+
+// ---- Preferences ----
+
+const SKIP_INTRO_KEY = 'nviq.skipIntro';
+
+/** Whether the "Before you start" sheet is skipped when starting a test. */
+export function getSkipIntro(): boolean {
+  try { return localStorage.getItem(SKIP_INTRO_KEY) === '1'; } catch { return false; }
+}
+
+export function setSkipIntro(skip: boolean): void {
+  write(SKIP_INTRO_KEY, skip ? 1 : null);
+}

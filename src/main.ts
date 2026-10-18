@@ -7,7 +7,16 @@ import { LETTERS, PATTERN_DEFS } from './figures';
 import { figureSvg } from './render';
 import { newSeed } from './rng';
 import { scoreRound } from './scoring';
-import { type ResultRecord, type Session, addHistory, clearHistory, loadHistory, loadSession, saveSession } from './storage';
+import { makeMatrix } from './gen/matrix';
+import { makeSeries } from './gen/series';
+import { makeOdd } from './gen/odd';
+import { mulberry32 } from './rng';
+import {
+  type ResultRecord, type Session, addHistory, clearHistory, getSkipIntro, loadHistory, loadSession, saveSession, setSkipIntro,
+} from './storage';
+import { confirmSheet, isSheetOpen, openSheet } from './ui/sheet';
+import { navigate } from './ui/nav';
+import * as haptics from './ui/haptics';
 
 const app = document.getElementById('app')!;
 if (Capacitor.isNativePlatform()) document.documentElement.classList.add('native');
@@ -34,93 +43,180 @@ function stopTimers() {
 }
 
 // =============================================================================================
+// Shared content
+
+const ICON_INFO = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.25"/><path d="M12 11v5.5"/><circle cx="12" cy="7.6" r="0.6" fill="currentColor"/></svg>';
+const ICON_CHEVRON = '<svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1.5 1.5 6.5 7l-5 5.5"/></svg>';
+const ICON_BACK = '<svg viewBox="0 0 10 18" aria-hidden="true"><path d="M8.5 1.5 1.5 9l7 7.5"/></svg>';
+
+const RULES = `
+  <ul class="rule-list">
+    <li><strong>${ROUND_MS / 60000} minutes</strong> for the whole test, not per puzzle — skip around freely and come back.</li>
+    <li><strong>It gets harder</strong> as you go. Most people don't finish every puzzle.</li>
+    <li><strong>Guess</strong> if you're short of time: a wrong answer costs no more than a blank one.</li>
+    <li><strong>Submit</strong> whenever you're done. When time runs out, the test is submitted for you.</li>
+  </ul>`;
+
+const METHOD = `
+  <p><strong>Item types.</strong> Matrices follow the design of Raven's Progressive Matrices, the core of most culture-reduced IQ tests, including many Mensa admission tests. Series and odd-one-out puzzles follow the matching subtests of Cattell's Culture Fair Intelligence Test. All of them measure <em>fluid reasoning</em>: finding abstract rules in material you haven't seen before.</p>
+  <p><strong>Puzzle generation.</strong> Matrices are built from the rule types Carpenter, Just &amp; Shell (1990) identified in Raven's test: constant, progression, distribution of three values, arithmetic (adding and subtracting), and set operations such as XOR, applied to shape, fill, number and position. Further matrices overlay lines (adding, subtracting or cancelling them out) or rotate and mirror a pattern. A puzzle is rejected if another sensible reading of the rows or columns would give a different answer. Following the I-RAVEN dataset (Hu et al., 2021), the eight options form a balanced tree, so every feature of the answer appears in exactly half the options. Choosing the most common features gets you nowhere.</p>
+  <p><strong>Scoring.</strong> Your answers are scored with a three-parameter item response model (3PL), the method behind modern adaptive tests. Harder puzzles count for more, and the model accounts for lucky guesses. The ability estimate is converted to the IQ scale (mean 100, standard deviation 15).</p>
+  <p><strong>Limitations.</strong> Puzzle difficulties are set from rule complexity, not measured on a large norm group, and a 10-minute test can only be so precise. Take the score as an informed estimate, not a clinical or official IQ result.</p>
+  <p><strong>Accessibility.</strong> Figures use only black, white and black-and-white patterns, so colour vision doesn't matter. On a keyboard, press <kbd>A</kbd>–<kbd>H</kbd> to answer and <kbd>←</kbd>/<kbd>→</kbd> to move between puzzles.</p>`;
+
+// Fixed example puzzles (same seeds every time) for the illustrations.
+let examples: { matrix: Puzzle; series: Puzzle; odd: Puzzle } | undefined;
+const getExamples = () => (examples ??= {
+  matrix: makeMatrix(mulberry32(11), 1),
+  series: makeSeries(mulberry32(5), 1),
+  odd: makeOdd(mulberry32(3), 'type'),
+});
+
+const miniCell = (f: Puzzle['stem'][number]) => f ? `<span class="mini-cell">${figureSvg(f)}</span>` : '<span class="mini-cell missing">?</span>';
+const miniMatrix = (p: Puzzle) => `<span class="mini mini-matrix" aria-hidden="true">${p.stem.map(miniCell).join('')}</span>`;
+const miniSeries = (p: Puzzle) => `<span class="mini mini-series" aria-hidden="true">${[...p.stem.slice(1, 4), null].map(miniCell).join('')}</span>`;
+const miniOdd = (p: Puzzle) => `<span class="mini mini-odd" aria-hidden="true">${p.options.map(f => miniCell(f)).join('')}</span>`;
+
+function puzzleTypes(): string {
+  const ex = getExamples();
+  return `
+    <ul class="type-list">
+      <li>${miniMatrix(ex.matrix)}<div><strong>Matrices</strong><span>Find the panel that completes the grid. Every row follows the same hidden rules.</span></div></li>
+      <li>${miniSeries(ex.series)}<div><strong>Series</strong><span>Work out how each part changes, and pick the next frame.</span></div></li>
+      <li>${miniOdd(ex.odd)}<div><strong>Odd one out</strong><span>Four figures share a rule. Find the one that breaks it.</span></div></li>
+    </ul>`;
+}
+
+const fmtDate = (t: number) => {
+  const d = new Date(t);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) });
+};
+
+// =============================================================================================
 // Home
+
+function sparkline(values: number[]): string {
+  const lo = Math.min(...values) - 4, hi = Math.max(...values) + 4;
+  const x = (i: number) => (values.length === 1 ? 50 : (i / (values.length - 1)) * 100);
+  const y = (v: number) => 26 - ((v - lo) / (hi - lo)) * 22;
+  const pts = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const last = values.length - 1;
+  return `
+    <svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
+      <polyline points="${pts}" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <span class="spark-dot" style="left:${x(last)}%;top:${(y(values[last]) / 30) * 100}%"></span>`;
+}
 
 function showHome() {
   stopTimers();
   window.scrollTo(0, 0);
   const history = loadHistory();
+  const latest = history[0];
+  const best = history.length ? Math.max(...history.map(r => r.iq)) : 0;
+  const trend = history.slice(0, 10).map(r => r.iq).reverse();
+
+  const summary = latest ? `
+    <section class="card summary" aria-label="Your scores">
+      <dl class="summary-stats">
+        <div><dt>Latest</dt><dd>${latest.iq}</dd></div>
+        <div><dt>Best</dt><dd>${best}</dd></div>
+        <div><dt>Tests</dt><dd>${history.length}</dd></div>
+      </dl>
+      ${trend.length > 1 ? `<div class="spark-wrap">${sparkline(trend)}</div><p class="summary-note">Last ${trend.length} tests</p>` : ''}
+    </section>` : `
+    <section class="card summary empty">
+      ${miniMatrix(getExamples().matrix)}
+      <div>
+        <h2>Test your pattern reasoning</h2>
+        <p>${ROUND_ITEMS} puzzles · ${ROUND_MS / 60000} minutes · no words or numbers</p>
+      </div>
+    </section>`;
+
   app.innerHTML = `
   <main class="wrap home">
-    <header class="hero">
-      <p class="eyebrow">Nonverbal reasoning test</p>
-      <h1>How well do you see patterns?</h1>
-      <p class="lead">${ROUND_ITEMS} puzzles, ${ROUND_MS / 60000} minutes. Only shapes and patterns — no words, numbers or general knowledge. Every round is freshly generated.</p>
-      <button class="btn primary big" id="start">Start test</button>
+    <header class="large-title">
+      <h1>Nonverbal IQ</h1>
+      <button class="icon-btn" id="info" aria-label="About and settings">${ICON_INFO}</button>
     </header>
-
-    <section class="kinds" aria-label="Puzzle types">
-      <article class="kind">
-        <h2>Matrices</h2>
-        <p>A 3×3 grid with the last panel missing. Each row follows the same hidden rules — find the panel that completes it.</p>
-      </article>
-      <article class="kind">
-        <h2>Series</h2>
-        <p>Five frames change step by step. Work out what each part is doing and pick the sixth frame.</p>
-      </article>
-      <article class="kind">
-        <h2>Odd one out</h2>
-        <p>Four figures share a rule and one breaks it. Find the one that doesn't belong.</p>
-      </article>
-    </section>
-
-    <section class="card rules">
-      <h2>Before you start</h2>
-      <ul>
-        <li>The clock runs for the whole test, not per puzzle. Skip around freely and come back later.</li>
-        <li>Puzzles get harder as you go. Most people don't finish them all.</li>
-        <li>A wrong answer costs no more than a blank one, so guess if you're short of time.</li>
-        <li>You can submit at any time. When the time is up, the test is submitted automatically.</li>
-        <li>Afterwards you'll see your score and a worked solution for every puzzle.</li>
-      </ul>
-    </section>
-
+    ${summary}
     ${history.length ? `
-    <section class="card history">
-      <div class="row-between">
-        <h2>Your previous results</h2>
-        <button class="btn ghost small" id="clear-history">Clear</button>
-      </div>
-      <ul class="hist-list">
-        ${history.map((r, i) => `
-          <li><button class="hist" data-i="${i}">
-            <span class="hist-date">${new Date(r.finishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-            <span class="hist-score">${r.correct}/${r.total}</span>
-            <span class="hist-iq">IQ ${r.iq}</span>
-          </button></li>`).join('')}
-      </ul>
-    </section>` : ''}
+    <h2 class="list-title">Previous results</h2>
+    <ul class="list">
+      ${history.map((r, i) => `
+        <li><button class="list-row" data-i="${i}">
+          <span class="row-main"><span>${fmtDate(r.finishedAt)}</span><small>${r.correct} of ${r.total} correct</small></span>
+          <span class="row-value">${r.iq}</span>${ICON_CHEVRON}
+        </button></li>`).join('')}
+    </ul>` : ''}
+  </main>
+  <div class="actionbar"><div class="actionbar-in"><button class="btn primary big block" id="start">Start test</button></div></div>`;
 
-    <details class="card about">
-      <summary>About the method</summary>
-      <p><strong>Item types.</strong> Matrices follow the design of Raven's Progressive Matrices, the core of most culture-reduced IQ tests, including many Mensa admission tests. Series and odd-one-out puzzles follow the matching subtests of Cattell's Culture Fair Intelligence Test. All of them measure <em>fluid reasoning</em>: finding abstract rules in material you haven't seen before.</p>
-      <p><strong>Puzzle generation.</strong> Matrices are built from the rule types Carpenter, Just &amp; Shell (1990) identified in Raven's test: constant, progression, distribution of three values, arithmetic (adding and subtracting), and set operations such as XOR, applied to shape, fill, number and position. Further matrices overlay lines (adding, subtracting or cancelling them out) or rotate and mirror a pattern. A puzzle is rejected if another sensible reading of the rows or columns would give a different answer. Following the I-RAVEN dataset (Hu et al., 2021), the eight options form a balanced tree, so every feature of the answer appears in exactly half the options. Choosing the most common features gets you nowhere.</p>
-      <p><strong>Scoring.</strong> Your answers are scored with a three-parameter item response model (3PL), the method behind modern adaptive tests. Harder puzzles count for more, and the model accounts for lucky guesses. The ability estimate is converted to the IQ scale (mean 100, standard deviation 15).</p>
-      <p><strong>Limitations.</strong> Puzzle difficulties are set from rule complexity, not measured on a large norm group, and a 10-minute test can only be so precise. Take the score as an informed estimate, not a clinical or official IQ result.</p>
-      <p><strong>Accessibility.</strong> Figures use only black, white and black-and-white patterns, so colour vision doesn't matter. On a keyboard, press <kbd>A</kbd>–<kbd>H</kbd> to answer and <kbd>←</kbd>/<kbd>→</kbd> to move between puzzles.</p>
-    </details>
-  </main>`;
+  $('#start').addEventListener('click', requestStart);
+  $('#info').addEventListener('click', showInfo);
+  app.querySelectorAll<HTMLButtonElement>('.list-row').forEach(b =>
+    b.addEventListener('click', () => navigate('push', () => showResults(history[Number(b.dataset.i)]))));
+}
 
-  $('#start').addEventListener('click', () => startTest());
-  app.querySelectorAll<HTMLButtonElement>('.hist').forEach(b =>
-    b.addEventListener('click', () => showResults(history[Number(b.dataset.i)])));
-  app.querySelector('#clear-history')?.addEventListener('click', () => confirmDialog({
+/** Start button: show the "Before you start" sheet unless the user has turned it off. */
+function requestStart() {
+  if (getSkipIntro()) { beginTest(); return; }
+  const s = openSheet(`
+    <div class="sheet-head">
+      <h2>Before you start</h2>
+      <p>${ROUND_ITEMS} puzzles · ${ROUND_MS / 60000} minutes</p>
+    </div>
+    ${puzzleTypes()}
+    ${RULES}
+    <label class="check"><input type="checkbox" id="skip-intro"> Don't show this again</label>
+    <button class="btn primary big block" id="begin">Begin</button>`, { label: 'Before you start', className: 'intro' });
+  s.el.querySelector('#begin')!.addEventListener('click', () => {
+    if (s.el.querySelector<HTMLInputElement>('#skip-intro')!.checked) setSkipIntro(true);
+    s.close();
+    beginTest();
+  });
+}
+
+function showInfo() {
+  const history = loadHistory();
+  const s = openSheet(`
+    <div class="sheet-head"><h2>About</h2></div>
+
+    <h3 class="group-title">Settings</h3>
+    <div class="group">
+      <label class="group-row">
+        <span>Show tips before each test</span>
+        <input type="checkbox" class="switch" id="tips" ${getSkipIntro() ? '' : 'checked'}>
+      </label>
+      <button class="group-row danger" id="clear" ${history.length ? '' : 'disabled'}>Clear all results</button>
+    </div>
+    <p class="group-note">Your results are stored only on this device. Nothing is sent anywhere.</p>
+
+    <h3 class="group-title">How the test works</h3>
+    <div class="group pad">${puzzleTypes()}${RULES}</div>
+
+    <h3 class="group-title">The method</h3>
+    <div class="group pad prose">${METHOD}</div>`, { label: 'About and settings', className: 'tall' });
+
+  s.el.querySelector<HTMLInputElement>('#tips')!.addEventListener('change', e => setSkipIntro(!(e.target as HTMLInputElement).checked));
+  s.el.querySelector('#clear')!.addEventListener('click', () => confirmSheet({
     title: 'Clear all results?',
-    body: `This permanently deletes ${history.length === 1 ? 'your saved result' : `all <strong>${history.length}</strong> saved results`} from this browser, including their solutions. It can't be undone.`,
+    body: `This permanently deletes ${history.length === 1 ? 'your saved result' : `all <strong>${history.length}</strong> saved results`} from this device, including their solutions. It can't be undone.`,
     cancel: 'Keep them',
     confirm: 'Clear all',
     danger: true,
-    onConfirm: () => { clearHistory(); showHome(); },
+    onConfirm: () => { clearHistory(); s.close(); showHome(); },
   }));
 }
 
 // =============================================================================================
 // Test
 
-function startTest() {
+function beginTest() {
   session = { v: GEN_VERSION, seed: newSeed(), startedAt: Date.now(), durationMs: ROUND_MS, answers: Array(ROUND_ITEMS).fill(null), current: 0 };
   saveSession(session);
-  showTest();
+  navigate('push', showTest);
 }
 
 const remaining = () => (session ? session.startedAt + session.durationMs - Date.now() : 0);
@@ -187,6 +283,7 @@ function goTo(i: number) {
 function choose(o: number) {
   const s = session!;
   const first = s.answers[s.current] === null;
+  if (s.answers[s.current] !== o) haptics.tap();
   s.answers[s.current] = o;
   saveSession(s);
   renderQuestion();
@@ -230,43 +327,9 @@ function renderQuestion() {
     </div>`;
 }
 
-interface ConfirmOptions {
-  title: string;
-  body: string;
-  cancel: string;
-  confirm: string;
-  /** Destructive action: red button, and focus starts on Cancel so Enter can't trigger it by accident. */
-  danger?: boolean;
-  onConfirm: () => void;
-}
-
-function confirmDialog(o: ConfirmOptions) {
-  const back = document.createElement('div');
-  back.className = 'modal-back';
-  back.innerHTML = `
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
-      <h2 id="m-title">${o.title}</h2>
-      <p>${o.body}</p>
-      <div class="modal-actions">
-        <button class="btn" data-act="cancel">${o.cancel}</button>
-        <button class="btn ${o.danger ? 'danger' : 'primary'}" data-act="confirm">${o.confirm}</button>
-      </div>
-    </div>`;
-  const close = () => { back.remove(); document.removeEventListener('keydown', onKey, true); };
-  const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
-  back.addEventListener('click', e => {
-    const act = (e.target as HTMLElement).closest<HTMLElement>('[data-act]')?.dataset.act;
-    if (act === 'confirm') { close(); o.onConfirm(); }
-    else if (act === 'cancel' || e.target === back) close();
-  });
-  document.addEventListener('keydown', onKey, true);
-  document.body.appendChild(back);
-  back.querySelector<HTMLButtonElement>(`[data-act="${o.danger ? 'cancel' : 'confirm'}"]`)!.focus();
-}
-
 function confirmSubmit() {
   const answered = session!.answers.filter(a => a !== null).length;
-  confirmDialog({
+  confirmSheet({
     title: 'Submit your answers?',
     body: `You've answered <strong>${answered} of ${puzzles.length}</strong> puzzles and have <strong>${fmtTime(remaining())}</strong> left.
       ${answered < puzzles.length ? 'Unanswered puzzles count as wrong.' : ''}`,
@@ -279,7 +342,9 @@ function confirmSubmit() {
 function finish(timedOut: boolean) {
   const s = session!;
   stopTimers();
-  document.querySelector('.modal-back')?.remove();
+  document.querySelectorAll('.sheet-back').forEach(el => el.remove());
+  document.body.classList.remove('sheet-lock');
+  haptics.done();
   const score = scoreRound(puzzles, s.answers);
   const record: ResultRecord = {
     v: GEN_VERSION,
@@ -295,7 +360,7 @@ function finish(timedOut: boolean) {
   addHistory(record);
   session = null;
   saveSession(null);
-  showResults(record);
+  navigate('push', () => showResults(record));
 }
 
 // =============================================================================================
@@ -341,7 +406,13 @@ function showResults(record: ResultRecord) {
   const pctText = pct >= 99.9 ? 'more than 99.9%' : pct < 1 ? 'less than 1%' : `about ${Math.round(pct)}%`;
 
   app.innerHTML = `
-  <main class="wrap results">
+  <header class="topnav">
+    <div class="topnav-in">
+      <button class="nav-back" id="home">${ICON_BACK}<span>Home</span></button>
+      <span class="topnav-title">Result</span>
+    </div>
+  </header>
+  <main class="wrap results under-nav">
     <section class="card score-card">
       <p class="eyebrow">${record.timedOut ? 'Time’s up — your result' : 'Your result'}</p>
       <div class="score-main">
@@ -358,11 +429,8 @@ function showResults(record: ResultRecord) {
         <div><dt>Answered</dt><dd>${score.answered} / ${score.total}</dd></div>
         <div><dt>Time used</dt><dd>${fmtTime(record.elapsedMs)}</dd></div>
       </dl>
-      <div class="actions">
-        <button class="btn primary" id="again">Take a new test</button>
-        <button class="btn" id="home">Home</button>
-      </div>
-      <p class="fine">An estimate from a short, unnormed test — not an official IQ assessment. See “About the method” on the home page.</p>
+      <button class="btn primary big block" id="again">Take a new test</button>
+      <p class="fine">An estimate from a short, unnormed test — not an official IQ assessment. See ⓘ on the home screen for how it works.</p>
     </section>
 
     <h2 class="review-title">Review</h2>
@@ -386,8 +454,8 @@ function showResults(record: ResultRecord) {
     </ol>
   </main>`;
 
-  $('#again').addEventListener('click', () => startTest());
-  $('#home').addEventListener('click', showHome);
+  $('#again').addEventListener('click', requestStart);
+  $('#home').addEventListener('click', () => navigate('pop', showHome));
   app.querySelectorAll<HTMLButtonElement>('.rv-head').forEach(btn => btn.addEventListener('click', () => {
     const i = Number(btn.dataset.i);
     const body = btn.nextElementSibling as HTMLElement;
@@ -419,7 +487,7 @@ function reviewBody(p: Puzzle, a: number | null): string {
 // Keyboard
 
 document.addEventListener('keydown', e => {
-  if (!session || document.querySelector('.modal-back') || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (!session || isSheetOpen() || e.metaKey || e.ctrlKey || e.altKey) return;
   const p = puzzles[session.current];
   const k = e.key.toUpperCase();
   const idx = LETTERS.indexOf(k);
