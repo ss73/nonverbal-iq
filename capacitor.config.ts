@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   // Reverse-DNS bundle identifier. It can't be changed once the app is on the App Store.
-  appId: 'io.github.ss73.nonverbaliq',
+  appId: 'com.ellangames.nonverbaliq',
   appName: 'Nonverbal IQ',
   webDir: 'dist',
   plugins: {

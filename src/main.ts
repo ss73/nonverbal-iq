@@ -17,6 +17,7 @@ import {
 import { confirmSheet, isSheetOpen, openSheet } from './ui/sheet';
 import { navigate } from './ui/nav';
 import * as haptics from './ui/haptics';
+import { type Shot, seedShot } from './shots';
 
 const app = document.getElementById('app')!;
 if (Capacitor.isNativePlatform()) document.documentElement.classList.add('native');
@@ -506,8 +507,21 @@ if ('serviceWorker' in navigator && import.meta.env.PROD && location.protocol ==
   navigator.serviceWorker.register('./sw.js').catch(() => { /* offline support is optional */ });
 }
 
+// App Store screenshot builds only (VITE_SHOT=<scene>); compiled out of normal builds.
+const shot = import.meta.env.VITE_SHOT as Shot | undefined;
+if (shot) seedShot(shot);
+
 session = loadSession();
-if (session) {
+if (shot === 'results' || shot === 'review') {
+  showResults(loadHistory()[0]);
+  if (shot === 'review') {
+    const heads = app.querySelectorAll<HTMLButtonElement>('.rv-head');
+    const pick = heads[heads.length - 4];
+    pick.click();
+    pick.scrollIntoView({ block: 'start' });
+    window.scrollBy(0, -64);
+  }
+} else if (session) {
   if (remaining() > 0) showTest();
   else { puzzles = buildRound(session.seed); finish(true); }
 } else {
