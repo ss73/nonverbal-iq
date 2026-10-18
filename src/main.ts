@@ -62,7 +62,7 @@ const METHOD = `
   <p><strong>Puzzle generation.</strong> Matrices are built from the rule types Carpenter, Just &amp; Shell (1990) identified in Raven's test: constant, progression, distribution of three values, arithmetic (adding and subtracting), and set operations such as XOR, applied to shape, fill, number and position. Further matrices overlay lines (adding, subtracting or cancelling them out) or rotate and mirror a pattern. A puzzle is rejected if another sensible reading of the rows or columns would give a different answer. Following the I-RAVEN dataset (Hu et al., 2021), the eight options form a balanced tree, so every feature of the answer appears in exactly half the options. Choosing the most common features gets you nowhere.</p>
   <p><strong>Scoring.</strong> Your answers are scored with a three-parameter item response model (3PL), the method behind modern adaptive tests. Harder puzzles count for more, and the model accounts for lucky guesses. The ability estimate is converted to the IQ scale (mean 100, standard deviation 15).</p>
   <p><strong>Limitations.</strong> Puzzle difficulties are set from rule complexity, not measured on a large norm group, and a 10-minute test can only be so precise. Take the score as an informed estimate, not a clinical or official IQ result.</p>
-  <p><strong>Accessibility.</strong> Figures use only black, white and black-and-white patterns, so colour vision doesn't matter. On a keyboard, press <kbd>A</kbd>–<kbd>H</kbd> to answer and <kbd>←</kbd>/<kbd>→</kbd> to move between puzzles.</p>`;
+`;
 
 // Fixed example puzzles (same seeds every time) for the illustrations.
 let examples: { matrix: Puzzle; series: Puzzle; odd: Puzzle } | undefined;
