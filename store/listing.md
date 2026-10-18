@@ -19,7 +19,7 @@ Copy-paste source for App Store Connect. Apple's character limits are in bracket
 
 - **Support URL:** https://ellangames.com/nonverbal-iq/
 - **Marketing URL** (optional): https://ellangames.com/nonverbal-iq/
-- **Privacy Policy URL:** https://ellangames.com/nonverbal-iq/privacy
+- **Privacy Policy URL:** https://ellangames.com/nonverbal-iq/privacy/
 
 ## App Privacy (the "nutrition label")
 
