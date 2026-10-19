@@ -46,3 +46,7 @@ The app icon and launch screen images are in `ios/App/App/Assets.xcassets`. The 
 
 Item difficulties come from rule complexity, not from a norm sample, so the score is an estimate.
 To calibrate properly, collect anonymous response data and fit the item parameters.
+
+## License
+
+Copyright © 2026 ellan games AB. All rights reserved. See [LICENSE](LICENSE).
