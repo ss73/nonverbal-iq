@@ -43,14 +43,16 @@ for scene in "${SCENES[@]}"; do
   n=$((n + 1))
 done
 
-# Other accepted sizes: scale to height, then trim the few extra pixels at the sides.
+# Other accepted sizes, cropped by a few pixels where the aspect ratio differs slightly.
 for size in 1206x2622 1290x2796 1284x2778; do
   w=${size%x*}; h=${size#*x}
   case $w in 1206) inch=6.3in ;; 1284) inch=6.5in ;; *) inch=6.9in ;; esac
   dir="store/screenshots/$inch-$size"
   mkdir -p "$dir"
   for f in "$OUT"/*.jpg; do
-    sips -s format jpeg -s formatOptions 95 --resampleHeight "$h" "$f" --out "$dir/$(basename "$f")" >/dev/null
+    # Scale so both sides cover the target (source is 1320×2868), then crop the overflow.
+    if (( w * 2868 >= h * 1320 )); then fit=(--resampleWidth "$w"); else fit=(--resampleHeight "$h"); fi
+    sips -s format jpeg -s formatOptions 95 "${fit[@]}" "$f" --out "$dir/$(basename "$f")" >/dev/null
     sips --cropToHeightWidth "$h" "$w" "$dir/$(basename "$f")" >/dev/null
   done
 done
