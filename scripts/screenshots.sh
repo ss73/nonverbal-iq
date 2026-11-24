@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # App Store screenshots from the iPhone 17 Pro Max simulator (6.9", 1320×2868).
 # Usage: scripts/screenshots.sh [light|dark]   → store/screenshots/6.9in-1320x2868/NN-<scene>.jpg,
-# plus 1290×2796 (older 6.9") and 1284×2778 (6.5") copies for App Store Connect slots that reject 1320×2868.
+# plus 1206×2622 (6.3"), 1290×2796 (older 6.9") and 1284×2778 (6.5") copies for App Store Connect slots that reject 1320×2868.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -43,12 +43,14 @@ for scene in "${SCENES[@]}"; do
   n=$((n + 1))
 done
 
-# Other accepted sizes: scale to width, then trim the few extra pixels top and bottom.
-for size in 1290x2796 1284x2778; do
-  w=${size%x*}; h=${size#*x}; dir="store/screenshots/$( [ "$w" = 1284 ] && echo 6.5in || echo 6.9in )-$size"
+# Other accepted sizes: scale to height, then trim the few extra pixels at the sides.
+for size in 1206x2622 1290x2796 1284x2778; do
+  w=${size%x*}; h=${size#*x}
+  case $w in 1206) inch=6.3in ;; 1284) inch=6.5in ;; *) inch=6.9in ;; esac
+  dir="store/screenshots/$inch-$size"
   mkdir -p "$dir"
   for f in "$OUT"/*.jpg; do
-    sips -s format jpeg -s formatOptions 95 --resampleWidth "$w" "$f" --out "$dir/$(basename "$f")" >/dev/null
+    sips -s format jpeg -s formatOptions 95 --resampleHeight "$h" "$f" --out "$dir/$(basename "$f")" >/dev/null
     sips --cropToHeightWidth "$h" "$w" "$dir/$(basename "$f")" >/dev/null
   done
 done
