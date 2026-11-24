@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # App Store screenshots from the iPhone 17 Pro Max simulator (6.9", 1320×2868).
-# Usage: scripts/screenshots.sh [light|dark]   → store/screenshots/<appearance>/NN-<scene>.jpg
+# Usage: scripts/screenshots.sh [light|dark]   → store/screenshots/6.9in-1320x2868/NN-<scene>.jpg,
+# plus 1290×2796 (older 6.9") and 1284×2778 (6.5") copies for App Store Connect slots that reject 1320×2868.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -8,7 +9,7 @@ APPEARANCE="${1:-light}"
 DEVICE="iPhone 17 Pro Max"
 BUNDLE="com.ellangames.nonverbaliq"
 SCENES=(home matrix series results review)
-OUT="store/screenshots/$APPEARANCE"
+OUT="store/screenshots/6.9in-1320x2868"
 mkdir -p "$OUT"
 
 UDID=$(xcrun simctl list devices available | grep "$DEVICE (" | head -1 | grep -oE '[0-9A-F-]{36}')
@@ -40,6 +41,16 @@ for scene in "${SCENES[@]}"; do
   # JPEG: App Store Connect rejects PNGs with an alpha channel, which simulator screenshots have.
   xcrun simctl io "$UDID" screenshot --type=jpeg "$OUT/$(printf %02d $n)-$scene.jpg" 2>/dev/null
   n=$((n + 1))
+done
+
+# Other accepted sizes: scale to width, then trim the few extra pixels top and bottom.
+for size in 1290x2796 1284x2778; do
+  w=${size%x*}; h=${size#*x}; dir="store/screenshots/$( [ "$w" = 1284 ] && echo 6.5in || echo 6.9in )-$size"
+  mkdir -p "$dir"
+  for f in "$OUT"/*.jpg; do
+    sips -s format jpeg -s formatOptions 95 --resampleWidth "$w" "$f" --out "$dir/$(basename "$f")" >/dev/null
+    sips --cropToHeightWidth "$h" "$w" "$dir/$(basename "$f")" >/dev/null
+  done
 done
 
 # Leave the simulator app as a normal build again.
