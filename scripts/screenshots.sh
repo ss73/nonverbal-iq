@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # App Store screenshots from the iPhone 17 Pro Max simulator (6.9", 1320×2868).
-# Usage: scripts/screenshots.sh [light|dark]   → store/screenshots/<appearance>/NN-<scene>.png
+# Usage: scripts/screenshots.sh [light|dark]   → store/screenshots/<appearance>/NN-<scene>.jpg
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -37,7 +37,8 @@ for scene in "${SCENES[@]}"; do
   xcrun simctl install "$UDID" "$APP"
   xcrun simctl launch "$UDID" "$BUNDLE" >/dev/null
   sleep 7
-  xcrun simctl io "$UDID" screenshot --type=png "$OUT/$(printf %02d $n)-$scene.png" 2>/dev/null
+  # JPEG: App Store Connect rejects PNGs with an alpha channel, which simulator screenshots have.
+  xcrun simctl io "$UDID" screenshot --type=jpeg "$OUT/$(printf %02d $n)-$scene.jpg" 2>/dev/null
   n=$((n + 1))
 done
 
